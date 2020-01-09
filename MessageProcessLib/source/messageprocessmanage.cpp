@@ -5,17 +5,17 @@
 #include "tcpserver.h"
 #include "string.h"
 
-void CMessageProcessManage::send_message_test_slot()
-{
-	SMessageBase message;
-	message.type = 0x0007;
-	message.nodeID = -1;
-	message.shelfID = -1;
-	char temp[]= "definable";
-	strcpy(pdata, temp);
-	message.data = pdata;
-	append_deliver_message(message);
-}
+// void CMessageProcessManage::send_message_test_slot()
+// {
+// 	SMessageBase message;
+// 	message.type = 0x0007;
+// 	message.nodeID = -1;
+// 	message.shelfID = -1;
+// 	char temp[]= "definable";
+// 	strcpy(pdata, temp);
+// 	message.data = pdata;
+// 	append_deliver_message(message);
+// }
 
 CMessageProcessManage::CMessageProcessManage(QObject *parent)
 	: QObject(parent)
@@ -48,7 +48,7 @@ CMessageProcessManage::CMessageProcessManage(QObject *parent)
 	connect(this, &CMessageProcessManage::shutdown_signal, message_deliver_thread, &CMessageProcessThread::deleteLater);
 	connect(this, &CMessageProcessManage::shutdown_signal, ascend_mq, &AscendMQ::deleteLater);
 
-    connect(&_timer_, &QTimer::timeout, this, &CMessageProcessManage::send_message_test_slot);
+    //connect(&_timer_, &QTimer::timeout, this, &CMessageProcessManage::send_message_test_slot);
 }
 
 CMessageProcessManage::~CMessageProcessManage()
@@ -64,7 +64,7 @@ void CMessageProcessManage::start(QVector<ShelfInfo> &vshelfs)
 {	
 	emit enable_server();
 
-	ThreadHandle::getClass().initThreadType(ThreadHandle::THREADSIZE, 20);
+	ThreadHandle::getClass().initThreadType(ThreadHandle::HANDLESIZE, 3);
 	tcpServer->set_shelfInfos(vshelfs);
     //_timer_.start(1000);
     

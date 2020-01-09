@@ -18,7 +18,7 @@ signals:
 	void shutdown_signal();
 	//void ConsumeAMessageSignal(int i);
 public slots:
-	void send_message_test_slot();
+	//void send_message_test_slot();
 	
 public:
 	CMessageProcessManage(QObject *parent);
@@ -38,7 +38,7 @@ public:
 	void append_deliver_message(SMessageBase &message) const;	
     
 private:
-	char  pdata[1000];
+	//char  pdata[1000];
 	QMutex  mutex_;
 	TcpServer *tcpServer;
 	AscendMQ  *ascend_mq;

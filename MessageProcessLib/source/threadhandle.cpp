@@ -65,17 +65,21 @@ void ThreadHandle::initThreadType(ThreadType type, unsigned int max)
             if(type == THREADSIZE)
                 this->size = 10;  //固定10个线程的线程池
             else
-                this->size = 1000;
+                this->size = 100;
         }
 
         if (type == THREADSIZE)
             initThreadSize();
         else
         {
-            QThread * tmp = new QThread;
-
-            threadSize.insert(tmp,0);
-            tmp->start();
+            //先建立64个线程
+            for (int i = 0; i < 4; ++i)
+            {
+                QThread * tmp = new QThread;                
+                threadSize.insert(tmp, 0);
+                tmp->start();
+            }
+           
         }
     }
     initfist = true;
@@ -129,7 +133,6 @@ void ThreadHandle::clear()//清空计数退出，线程不释放
 {
     for (auto it  = threadSize.begin();it != threadSize.end() ;++it)
     {
-        it.value()  = 0;
-        
+        it.value()  = 0;        
     }
 }

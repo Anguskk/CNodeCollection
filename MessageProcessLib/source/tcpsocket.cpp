@@ -16,7 +16,7 @@ TcpSocket::TcpSocket(qintptr socketDescriptor, QObject *parent) : //构造函数
         // dicCOnnect响应
             qDebug() << "disconnect："<< this->peerAddress().toString()<<":"<<this->peerPort();
             //发送断开连接的用户信息
-            emit sockDisConnect(socketID,this->peerAddress().toString(),this->peerPort(),QThread::currentThread());
+            emit sockDisConnect(socketID,this->peerAddress().toString(),this->peerPort(),MacAddress,QThread::currentThread());
             this->deleteLater();
 			/*SMessageBase message;
 			message.shelfID = shelfID; message.nodeID = nodeID;
@@ -41,9 +41,9 @@ void TcpSocket::handleData(SMessageNodeBase& ori_message)
 {
     //TODO  重组上层消息,*data内容不拆
     SMessageBase  new_message = smessage_node_base2smessage_base(ori_message);
-    QString  str(static_cast<char*>(new_message.data));
-    qDebug() << str << '\n';
     emit handle_done(new_message);    
+    // QString  str(static_cast<char*>(new_message.data));
+    // qDebug() << str << '\n';
 }
 
 void TcpSocket::setShelfNode()
@@ -75,6 +75,11 @@ QString TcpSocket::getMacAddress()
 QTimer* TcpSocket::get_timer()
 {
     return timer_;
+}
+
+qintptr TcpSocket::get_socketID() const
+{
+    return socketID;
 }
 
 
@@ -149,22 +154,21 @@ void TcpSocket::sent_instant_message_slot(SMessageBase& message)
 
 void TcpSocket::disConTcp(int i)
 {
-	if (shelfID > 0 && nodeID > 0)
-	{
-		SMessageBase message;
-		message.shelfID = shelfID; message.nodeID = nodeID;
-		auto t_connectionStatusMsg = new SConnectionStatusMsg;
-		t_connectionStatusMsg->type = 0;
-		message.data = t_connectionStatusMsg;
-		message.type = ConnectionStatusMsg;
-		emit handle_done(message);
-	}
+	
 	
     if (i == socketID)
-    {        
-        disconnect(dis); 
-        this->disconnectFromHost();
-        this->deleteLater();
+    {
+        if (shelfID > 0 && nodeID > 0)
+        {
+            SMessageBase message;
+            message.shelfID = shelfID; message.nodeID = nodeID;
+            auto t_connectionStatusMsg = new SConnectionStatusMsg;
+            t_connectionStatusMsg->type = 0;
+            message.data = t_connectionStatusMsg;
+            message.type = ConnectionStatusMsg;
+            emit handle_done(message);
+        }
+        this->disconnectFromHost();        
     }
     else if (i == -1) //-1为全部断开
     {
@@ -189,7 +193,7 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
 {   
 	if (message.nodeID == -1 && message.shelfID == -1)
 	{
-		//停止检测计时
+		
 		timer_->stop();
 		//请求停止发送心跳包;
 		SMessageNodeBase query;
@@ -202,7 +206,12 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
 		//TODO  是否还要接收  命令的回复 ChargingConfirmMsg
 		//收到回复
 		//断开连接信号
-		disconnect(read_signal);
+        if (disconnect(read_signal) == false)
+        {
+            //断开连接信号
+            //信号没有断开
+            return;
+        }
 		//正式 问答 开始 发送请求
 		SMessageNodeBase node_message = smessage_base2smessage_node_base(message);
 		write_SMessageNodeBase(node_message);
@@ -213,38 +222,41 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
 		QByteArray  data;
 		QDataStream in(data);
 		in.setByteOrder(QDataStream::LittleEndian);
-		for (short i = 0; i < 2; i++)
-		{
-			this->waitForReadyRead(5000);
-			auto sum = bytesAvailable();
-			while (sum > 0)
-			{
-				data = this->read(4);
-				in >> receive.header.checkNum >> receive.header.type >> receive.header.length;
-				if (receive.header.type == message.type + 1)
-				{
-					data = readAll();
-					data.clear();
-					isSuccess = true;
-					break;
-				}
-				//丢掉无用消息
-				in.readRawData(data.data(), receive.header.length);
-				data.clear();
-				sum = sum - 4 - receive.header.length;
-			}
-			if (isSuccess)
-			{
-				break;
-			}
-		}
-		//重复第二次
-		if (!isSuccess)
-		{
-			disConTcp(socketID);
-			qDebug() << "error  no response  receive";
-		}
-
+        //3次执行，即3秒
+        for (short i = 0; i < 3; i++)
+        {
+            this->waitForReadyRead(1000);
+            auto sum = bytesAvailable();
+            data = this->readAll();
+            do
+            {
+                SMessageNodeBase receive;
+                in >> receive.header.checkNum >> receive.header.type >> receive.header.length;
+                in.readRawData(static_cast<char*>(receive.data), receive.header.length);
+                if (receive.header.type == message.type + 1)
+                {
+                    data.clear();
+                    isSuccess = true;
+                    break;
+                }
+                //丢掉无用消息              
+                sum = sum - 8 - receive.header.length;
+            } while (sum > 0);
+            if (isSuccess)
+            {
+                break;
+            }
+            else
+            {
+                QThread::currentThread()->sleep(500);
+            }
+        }
+        //异常判断
+        if (!isSuccess)
+        {
+            disConTcp(socketID);
+            qDebug() << "error  no response  receive";
+        }
 		//重新请求发送心跳包    
 		query.header.type = ChargingRequestMsg; query.header.length = sizeof(SRequestChargingMessage);
 		t_requestChargingMessage.monitoring[0] = 1;
@@ -313,16 +325,22 @@ void TcpSocket::parse_SMessageNodeBase(QByteArray &raw, SMessageNodeBase & node_
 void TcpSocket::time_out_slot()
 {
     //检查是否还收到心跳（充电）消息
-	/*if (heartbeat == false)
-	{
-		qDebug() << "connection failed ";
-		timer_->stop();
-		disConTcp(socketID);
-	}
-	else
-	{
-		heartbeat = false;
-	}*/
+    if (heartbeat == false)
+    {
+        qDebug() << "connection failed ";
+        timer_->stop();
+        disConTcp(socketID);
+    }
+    else
+    {
+        heartbeat = false;
+    }
+    if (response_flag != 0)
+    {
+        qDebug() << "didn't execute cache task ";
+        timer_->stop();
+        disConTcp(socketID);
+    }
 }
 
 void TcpSocket::error_slot(QAbstractSocket::SocketError)
@@ -336,8 +354,7 @@ void TcpSocket::error_slot(QAbstractSocket::SocketError)
 //读取数据
 void TcpSocket::readData()
 {
-    int size = this->bytesAvailable();
-    qDebug() << "Available size=" << size << '\n';
+    int size = this->bytesAvailable();    
 
 	QDataStream in(this);
 	in.setByteOrder(QDataStream::LittleEndian);
@@ -355,6 +372,10 @@ void TcpSocket::readData()
 			continue;
 		}
 		SMessageBase cache = tcp_server->get_cache_mode();
+        if (ori_message.header.type == cache.type + 1)
+        {
+            response_flag = 0;
+        }
 		//需要上传的及时消息
 		if (ori_message.header.type == AnnualInspectionConfirmMsg || ori_message.header.type == AnnualInspectionDownloadConfirmMsg
 			|| ori_message.header.type == ChargingConfirmMsg || ori_message.header.type == DownloadConfirmMsg)
@@ -371,6 +392,7 @@ void TcpSocket::readData()
 			}
 			if (ori_message.header.type != ChargingStateInfoMsg || cache.type == ChargingRequestMsg)
 				handleData(ori_message);
+            
 		}
 	}
 }
@@ -396,7 +418,18 @@ void TcpSocket::start_slot()
         return;
     }
     setMACAddress(ori_message);
+
+    // 查找MAC是否已经存在的情况
+   // 没有存在 继续执行
+   // 已经存在  删除之前的，替换为当前的
+    if (tcp_server->query_macClient(this->MacAddress, this))
+    {
+        //True为存在old
+        qDebug() << "already exist a same MAC";
+    }
+
     setShelfNode();
+    shelfID = 3;
     if (shelfID == 0 && nodeID == 0) {
         qDebug() << "fail to set ShelfNodeID \n";
         disConTcp(socketID);
@@ -460,10 +493,8 @@ void TcpSocket::start_slot()
 		timer_ = new QTimer;
 		connect(timer_, SIGNAL(timeout()), this, SLOT(time_out_slot()));
 		heartbeat = false;
-
 		timer_->start(3000);
-		//单次触发
-		//timer_.setInterval(3000);
+		
     }
    
 }

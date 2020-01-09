@@ -11,7 +11,7 @@ CMessageProcessThread::CMessageProcessThread(QObject *parent)
 
 CMessageProcessThread::~CMessageProcessThread()
 {
-	isThreadOpen = false;
+	
 	wait(2000);
 	terminate();
 }
@@ -60,7 +60,9 @@ void CMessageProcessThread::set_ascendq()
 
 void CMessageProcessThread::stopThread()
 {
+    mutex_.lock();
 	isThreadOpen = false;
+    mutex_.unlock();
 }
 
 void CMessageProcessThread::run()

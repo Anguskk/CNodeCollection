@@ -26,6 +26,7 @@ public:
     void parse_SMessageNodeBase(QByteArray &raw, QVector<SMessageNodeBase> & node_message);
 	QString getMacAddress(); 
     QTimer* get_timer();
+    qintptr get_socketID() const;
     void setMACAddress(SMessageNodeBase& ori_message);
     void send_connection(SMessageBase& message);
     void set_server(TcpServer * server);
@@ -35,7 +36,8 @@ public:
 signals:
     //void readData(const int,const QString &,const quint16,const QByteArray &);
     //NOTE:断开连接的用户信息，此信号必须发出！线程管理类根据信号计数的
-    void sockDisConnect(const int ,const QString &,const quint16, QThread *);
+
+    void sockDisConnect(const int ,const QString &,const quint16, QString &, QThread *);
     void handle_done(SMessageBase& );
 
 public slots:    
@@ -67,11 +69,11 @@ protected:
 private:
     qintptr socketID;
     bool  heartbeat;
+    quint16         response_flag;
     TcpServer     *tcp_server;
     int                shelfID;                  //架子号
     int                nodeID;                   //节点号
     QString            MacAddress;
-    quint16         response_flag;
     QMetaObject::Connection dis;
     QMetaObject::Connection read_signal;
     QQueue<QByteArray> messages;

@@ -1,0 +1,14 @@
+<RCC>
+    <qresource prefix="/DataMonitor">
+        <file>connect.png</file>
+        <file>setup.png</file>
+        <file>annualinspection.png</file>
+        <file>annualinspectionreport.png</file>
+        <file>charging.png</file>
+        <file>download.png</file>
+        <file>setshelfs.png</file>
+        <file>annualinspectiondownload.png</file>
+        <file>chargingdownload.png</file>
+        <file>firmwareupgrade.png</file>
+    </qresource>
+</RCC>

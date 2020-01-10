@@ -112,7 +112,15 @@ void TcpSocket::set_status(quint16 status)
 
 TcpSocket::~TcpSocket()
 {
-    //delete timer_;
+    if (timer_ != nullptr)
+    {
+        if (timer_->isActive())
+        {
+            timer_->stop();
+        }
+        delete timer_;
+    }
+    
 }
 
 
@@ -429,7 +437,7 @@ void TcpSocket::start_slot()
     }
 
     setShelfNode();
-    shelfID = 3;
+    //shelfID = 3;
     if (shelfID == 0 && nodeID == 0) {
         qDebug() << "fail to set ShelfNodeID \n";
         disConTcp(socketID);

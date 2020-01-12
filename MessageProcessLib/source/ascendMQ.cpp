@@ -1,6 +1,7 @@
-#include "ascendMQ.h"
+
 #include <QDebug>
 #include <qmutex.h>
+#include "include/ascendMQ.h"
 AscendMQ* AscendMQ::m_pointer = nullptr;
 QMutex  AscendMQ::mutex;
 
@@ -48,6 +49,7 @@ void AscendMQ::addMessage(SMessageBase & message)
 // assert  队列至少一个元素
 SMessageBase AscendMQ::GetAMessage()
 {
+
 	return m_queue.dequeue();
 }
 

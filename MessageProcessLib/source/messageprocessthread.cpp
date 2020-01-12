@@ -1,19 +1,23 @@
-#include "messageprocessthread.h"
-#include "ascendMQ.h"
-#include "messageprocessmanage.h"
+#include "include/messageprocessthread.h"
+#include "include/ascendMQ.h"
+#include "include/messageprocessmanage.h"
 #include <memory>
 
 CMessageProcessThread::CMessageProcessThread(QObject *parent)
 	:QThread(parent)
 {
 	isThreadOpen = true;
+    m_queue = new QQueue<SMessageBase>;
 }
 
 CMessageProcessThread::~CMessageProcessThread()
 {
-	
-	wait(2000);
-	terminate();
+    stopThread();
+    delete m_queue;
+    m_queue = nullptr;
+    exit();
+    wait(2000);
+   
 }
 
 
@@ -58,6 +62,25 @@ void CMessageProcessThread::set_ascendq()
 	ascend_mq_->addMessage(message_base);*/
 }
 
+QQueue<SMessageBase>* CMessageProcessThread::GetQueue()
+{
+    QQueue<SMessageBase>* q=new QQueue<SMessageBase>;
+    QMutexLocker locker(&mutex_);
+    {
+        while (!m_queue->isEmpty())
+        {
+            q->append(m_queue->dequeue());
+        }
+    }
+    return  q;
+}
+
+SMessageBase CMessageProcessThread::GetAMessage()
+{
+    QMutexLocker locker(&mutex_);
+    return m_queue->dequeue();
+}
+
 void CMessageProcessThread::stopThread()
 {
     mutex_.lock();
@@ -67,15 +90,37 @@ void CMessageProcessThread::stopThread()
 
 void CMessageProcessThread::run()
 {
-    set_ascendq();
+    //set_ascendq();
 	while (isThreadOpen){		
-        QQueue<SMessageBase> tempQ = ascend_mq_->GetQueue();
-        if (!tempQ.isEmpty()) {
-            while (!tempQ.empty()) {
-                SMessageBase message_base = tempQ.dequeue();
+        QQueue<SMessageBase>* tempQ = GetQueue();
+        if (!tempQ->isEmpty()) {
+            while (!tempQ->empty()) {
+                SMessageBase message_base = tempQ->dequeue();
 				emit send_statusinfo(message_base);
 				qDebug() << "Success send_statusinfo  " << message_base.type;
             }
+            delete tempQ;
+            tempQ = nullptr;
+        }else
+        {
+            msleep(100);
         }
+
 	}
+}
+
+void CMessageProcessThread::appendMessage(SMessageBase& message)
+{
+    if (mutex_.tryLock())
+    {
+        m_queue->append(message);
+        mutex_.unlock();
+    }
+    else
+    {
+        mutex_.lock();
+        m_queue->append(message);
+        mutex_.unlock();
+    }
+
 }

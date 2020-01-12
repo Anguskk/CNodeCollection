@@ -42,7 +42,7 @@ signals:
 
 public slots:    
     void sent_instant_message_slot( SMessageBase& message);//发送信号的槽
-    void disConTcp(int i);
+    void disConTcp(qint64 i);
     void readData();//接收数据
 
 	void start_slot();
@@ -54,7 +54,7 @@ private:
      * \return 
      */
      SMessageBase smessage_node_base2smessage_base(SMessageNodeBase& node_message);
-     SMessageNodeBase smessage_base2smessage_node_base(SMessageBase& message_base);
+    static SMessageNodeBase smessage_base2smessage_node_base(SMessageBase& message_base);
      void  blocked_send_reiceive(SMessageBase& message);
 private slots:
     void time_out_slot();

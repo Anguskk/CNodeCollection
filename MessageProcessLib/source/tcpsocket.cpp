@@ -1,8 +1,8 @@
-﻿#include "tcpsocket.h"
+﻿#include "include/tcpsocket.h"
 #include <QtConcurrent/QtConcurrent>
 #include <QHostAddress>
 #include <QDebug>
-#include "tcpserver.h"
+#include "include/tcpserver.h"
 
 
 TcpSocket::TcpSocket(qintptr socketDescriptor, QObject *parent) : //构造函数在主线程执行，lambda在子线程
@@ -10,11 +10,13 @@ TcpSocket::TcpSocket(qintptr socketDescriptor, QObject *parent) : //构造函数
 {
     this->setSocketDescriptor(socketDescriptor);
   //  response_flag = 0x0000;
+    //setCurrentReadChannel(socketID%INT32_MAX);
+    //setCurrentWriteChannel(socketID%INT32_MAX);
     heartbeat = true;
     dis = connect(this,&TcpSocket::disconnected,
         [&](){
         // dicCOnnect响应
-            qDebug() << "disconnect："<< this->peerAddress().toString()<<":"<<this->peerPort();
+            qDebug() << "disconnect："<< this->peerAddress().toString()<<":port:"<<this->peerPort()<<":socketID:"<<this->socketID;
             //发送断开连接的用户信息
             emit sockDisConnect(socketID,this->peerAddress().toString(),this->peerPort(),MacAddress,QThread::currentThread());
             this->deleteLater();
@@ -39,7 +41,7 @@ TcpSocket::TcpSocket(qintptr socketDescriptor, QObject *parent) : //构造函数
 
 void TcpSocket::handleData(SMessageNodeBase& ori_message)
 {
-    //TODO  重组上层消息,*data内容不拆
+    // 重组上层消息,*data内容不拆
     SMessageBase  new_message = smessage_node_base2smessage_base(ori_message);
     emit handle_done(new_message);    
     // QString  str(static_cast<char*>(new_message.data));
@@ -93,6 +95,7 @@ void TcpSocket::setMACAddress(SMessageNodeBase& ori_message)
 		.arg(curMacinfo[2], 2, 16, QLatin1Char('0'))
 		.arg(curMacinfo[1], 2, 16, QLatin1Char('0'))
 		.arg(curMacinfo[0], 2, 16, QLatin1Char('0'));
+    qDebug() << MacAddress;
 }
 void TcpSocket::send_connection(SMessageBase& message)
 {
@@ -103,6 +106,7 @@ void TcpSocket::send_connection(SMessageBase& message)
 void TcpSocket::set_server(TcpServer * server)
 {
     tcp_server = server;
+    
 }
 
 void TcpSocket::set_status(quint16 status)
@@ -112,13 +116,16 @@ void TcpSocket::set_status(quint16 status)
 
 TcpSocket::~TcpSocket()
 {
+    
     if (timer_ != nullptr)
     {
         if (timer_->isActive())
         {
             timer_->stop();
         }
+        
         delete timer_;
+        timer_ = nullptr;
     }
     
 }
@@ -160,12 +167,15 @@ void TcpSocket::sent_instant_message_slot(SMessageBase& message)
     
 }
 
-void TcpSocket::disConTcp(int i)
+void TcpSocket::disConTcp(qint64 i)
 {
-	
-	
+   
     if (i == socketID)
     {
+        if (timer_->isActive())
+        {
+            timer_->stop();
+        }
         if (shelfID > 0 && nodeID > 0)
         {
             SMessageBase message;
@@ -211,7 +221,7 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
 		t_requestChargingMessage.monitoring[0] = 0;
 		query.data = &t_requestChargingMessage;
 		write_SMessageNodeBase(query);
-		//TODO  是否还要接收  命令的回复 ChargingConfirmMsg
+		
 		//收到回复
 		//断开连接信号
         if (disconnect(read_signal) == false)
@@ -270,6 +280,7 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
 		t_requestChargingMessage.monitoring[0] = 1;
 		query.data = &t_requestChargingMessage;
 		write_SMessageNodeBase(query);
+       
 		read_signal = connect(this, &TcpSocket::readyRead, this, &TcpSocket::readData);
 		timer_->start(3000);
 		//timer_.setSingleShot(true);
@@ -352,9 +363,13 @@ void TcpSocket::time_out_slot()
 }
 
 void TcpSocket::error_slot(QAbstractSocket::SocketError)
-{
+{   
     //向上层报告socket异常
     qDebug() << errorString() << '\n';
+    if (error() == QAbstractSocket::RemoteHostClosedError)
+    {
+        disConTcp(socketID);
+    }
 }
 
 
@@ -379,6 +394,10 @@ void TcpSocket::readData()
 			qDebug() << "Checksum  wrong";
 			continue;
 		}
+        if (ori_message.header.type == NoteInfoConfirmMsg)
+        {
+            qDebug() << "sorry to read Mac,wrong place";
+        }
 		SMessageBase cache = tcp_server->get_cache_mode();
         if (ori_message.header.type == cache.type + 1)
         {
@@ -398,6 +417,11 @@ void TcpSocket::readData()
 			{
 				heartbeat = true;
 			}
+            //TODO  测试
+            if (ori_message.header.type == ChargingStateInfoMsg)
+            {
+                handleData(ori_message);
+            }
 			if (ori_message.header.type != ChargingStateInfoMsg || cache.type == ChargingRequestMsg)
 				handleData(ori_message);
             
@@ -417,7 +441,23 @@ void TcpSocket::start_slot()
     write_SMessageNodeBase(query);
     //阻塞等待3秒
     this->waitForReadyRead(3000);    
-    rawdata = this->readAll();    
+    auto temp = this->bytesAvailable();
+    rawdata = this->readAll();
+    // QElapsedTimer timer1;
+    // timer1.start();   
+    // while (temp == 0)
+    // {
+    //     //write_SMessageNodeBase(query);
+    //     this->waitForReadyRead(1000);
+    //     temp = this->bytesAvailable();
+    //     rawdata = this->readAll();
+    //     if (timer1.hasExpired(5000))
+    //     {
+    //         disConTcp(socketID);
+    //         return;
+    //     }
+    //     
+    // }
     parse_SMessageNodeBase(rawdata, ori_message);   
 	if (ori_message.header.type != NoteInfoConfirmMsg)
     {
@@ -435,9 +475,11 @@ void TcpSocket::start_slot()
         //True为存在old
         qDebug() << "already exist a same MAC";
     }
-
-    setShelfNode();
-    //shelfID = 3;
+    //TODO
+    //setShelfNode();
+    QTime time = QTime::currentTime();
+    qsrand(time.msec() + time.second() * 1000);
+    shelfID = qrand()%7+1; nodeID = qrand()%16+1;
     if (shelfID == 0 && nodeID == 0) {
         qDebug() << "fail to set ShelfNodeID \n";
         disConTcp(socketID);
@@ -501,6 +543,7 @@ void TcpSocket::start_slot()
 		timer_ = new QTimer;
 		connect(timer_, SIGNAL(timeout()), this, SLOT(time_out_slot()));
 		heartbeat = false;
+        //TODO 修改定时检测时间
 		timer_->start(3000);
 		
     }

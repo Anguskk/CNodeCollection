@@ -21,6 +21,7 @@ public:
     void setMaxPendingConnections(int numConnections);//重写设置最大连接数函数
     void sent_group_messages(SMessageBase &message);
     void set_shelfInfos(QVector<ShelfInfo>& vshelfInfos);
+    void set_manage(CMessageProcessManage *manage);
     QVector<ShelfInfo> get_shelfInfos();
     SMessageBase get_firmware();
     void  set_firmware(SMessageBase &message);
@@ -74,6 +75,7 @@ protected slots:
 protected:
     void incomingConnection(qintptr socketDescriptor) override;//覆盖已获取多线程
 private:
+    CMessageProcessManage * manage_;
     QHash<int, TcpSocket *> * tcpClient;//管理连接的map
     //由架子号查找逻辑Socket位置
     /**

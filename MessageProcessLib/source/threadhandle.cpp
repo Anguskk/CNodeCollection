@@ -1,4 +1,4 @@
-﻿#include "threadhandle.h"
+﻿#include "include/threadhandle.h"
 
 #include <QtCore/qthread.h>
 
@@ -46,9 +46,10 @@ void ThreadHandle::removeThread(QThread * thread)
         t.value() --;
         if (type == HANDLESIZE && t.value() == 0 && threadSize.size() > 1)
         {
+            //TODO  修改
             threadSize.remove(thread);
-            thread->exit();
-            thread->wait(3000);
+            thread->exit();            
+            thread->wait(2000);
             delete thread;
         }
     }
@@ -103,7 +104,12 @@ QThread * ThreadHandle::findHandleSize() //查找到线程里的连接数小于�
     {
         if (it.value() < size)
         {
-            it.value() ++;
+            //TODO 修改
+            if (it.value() == 0)
+            {
+                it.key()->start();
+            }
+            ++it.value() ;
             return it.key();
         }
     }

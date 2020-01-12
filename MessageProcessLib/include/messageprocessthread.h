@@ -24,21 +24,25 @@ signals:
     void send_statusinfo(const SMessageBase& message);
 
 public:
-	//TODO   把AscendMQ上传的消息，传递到manage中   可以考虑加定时器，是否需要加锁
+	
 	CMessageProcessThread(QObject *parent = nullptr);
 	~CMessageProcessThread();
 	void set_TCPserver(TcpServer * server);
 	void set_Manage(CMessageProcessManage * manage);
     void set_ascendq();
+    QQueue<SMessageBase>* GetQueue();       //获得队列
+    SMessageBase GetAMessage();
 	void stopThread();
 	void run() override;
-	
+public slots:
+    void appendMessage(SMessageBase& message);
 private:
 	bool isThreadOpen;
     CMessageProcessManage* manage;
 	TcpServer  *server_;
     AscendMQ  * ascend_mq_;
 	//QQueue<SMessageNodeBase> messageQueue;
-	QMutex mutex_;
+    QQueue<SMessageBase> *m_queue;          //队列数据
+    QMutex mutex_;
 	QTimer timer_;
 };

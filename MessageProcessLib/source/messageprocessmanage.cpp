@@ -1,9 +1,11 @@
-#include "messageprocessmanage.h"
+#include "./include/messageprocessmanage.h"
 
 #include <QDebug>
-#include "threadhandle.h"
-#include "tcpserver.h"
+#include "./include/threadhandle.h"
+#include "./include/tcpserver.h"
 #include "string.h"
+#include "include/messageprocessmanage.h"
+//#include "../../DataMonitor/source/datamonitor.h"
 
 // void CMessageProcessManage::send_message_test_slot()
 // {
@@ -20,17 +22,18 @@
 CMessageProcessManage::CMessageProcessManage(QObject *parent)
 	: QObject(parent)
 {
+
 	qRegisterMetaType<SMessageBase>("SMessageBase");
 	qRegisterMetaType<SMessageBase>("SMessageBase&");
 	qRegisterMetaType<SMessageNodeBase>("SMessageNodeBase");
 	qRegisterMetaType<SMessageNodeBase>("SMessageNodeBase&");
-
+    qRegisterMetaType<QString>("QString&");
 	tcpServer = new TcpServer;	
 	auto serverThread = new QThread;
 	connect(this, &CMessageProcessManage::enable_server, tcpServer, &TcpServer::enable_serverSlot);
 	connect(this, &CMessageProcessManage::shutdown_signal, tcpServer, &TcpServer::deleteLater);
-	
-	//connect(this,&CMessageProcessManage::delete_child,)
+		
+    tcpServer->set_manage(this);
 	tcpServer->moveToThread(serverThread);
 	serverThread->start();
 	ascend_mq = AscendMQ::GetInstance();
@@ -58,16 +61,13 @@ CMessageProcessManage::~CMessageProcessManage()
 	//delete serverThread;
 }
 
-
-
 void CMessageProcessManage::start(QVector<ShelfInfo> &vshelfs)
 {	
 	emit enable_server();
-
+    //TODO  修改线程池模式
 	ThreadHandle::getClass().initThreadType(ThreadHandle::HANDLESIZE, 3);
 	tcpServer->set_shelfInfos(vshelfs);
-    //_timer_.start(1000);
-    
+    //_timer_.start(1000);    
     message_deliver_thread->start();
 }
 
@@ -83,5 +83,6 @@ CMessageProcessThread* CMessageProcessManage::get_process_thread() const
 
 void CMessageProcessManage::append_deliver_message(SMessageBase& message) const
 {
+    //tcpserver和manage没在一个线程，是否需要使用信号机制
 	tcpServer->sent_group_messages(message);
 }

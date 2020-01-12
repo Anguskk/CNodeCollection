@@ -4,7 +4,7 @@
 #include<string.h>
 #include<winsock2.h>
 #include<windows.h>
-#include "client.h"
+#include "include/client.h"
 
 #include <QProcess>
 

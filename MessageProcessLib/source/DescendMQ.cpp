@@ -1,7 +1,8 @@
-#include "descendMQ.h"
+//#include "descendMQ.h"
 #include <cstddef>
 #include <qmutex.h>
 #include <QObject>
+#include "include/descendMQ.h"
 DescendMQ* DescendMQ::m_pointer = NULL;
 QMutex  DescendMQ::mutex;
 

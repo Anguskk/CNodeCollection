@@ -6,6 +6,9 @@ MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MessageProcessLib", "MessageProcessLib\MessageProcessLib.vcxproj", "{D9771CAF-8159-49A8-84B6-29B3553EBEA2}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DataMonitor", "DataMonitor\DataMonitor.vcxproj", "{8506CC7E-2B92-42ED-AE0E-C7D1E35BE72A}"
+	ProjectSection(ProjectDependencies) = postProject
+		{D9771CAF-8159-49A8-84B6-29B3553EBEA2} = {D9771CAF-8159-49A8-84B6-29B3553EBEA2}
+	EndProjectSection
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -27,5 +30,6 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		Qt5Version = $(DefaultQtVersion)
+		SolutionGuid = {E3970259-FDBD-40D7-AC06-0CE9FF027F6E}
 	EndGlobalSection
 EndGlobal

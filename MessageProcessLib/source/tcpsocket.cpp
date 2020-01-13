@@ -171,11 +171,9 @@ void TcpSocket::disConTcp(qint64 i)
 {
    
     if (i == socketID)
-    {
-        if (timer_->isActive())
-        {
-            timer_->stop();
-        }
+    {        
+         timer_->stop();
+        
         if (shelfID > 0 && nodeID > 0)
         {
             SMessageBase message;
@@ -229,44 +227,36 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
             //断开连接信号
             //信号没有断开
             return;
-        }
+        }        
 		//正式 问答 开始 发送请求
 		SMessageNodeBase node_message = smessage_base2smessage_node_base(message);
 		write_SMessageNodeBase(node_message);
 
 		//从缓存中读取回复
 		bool isSuccess = false;
-		SMessageNodeBase receive;
-		QByteArray  data;
-		QDataStream in(data);
+		SMessageNodeBase receive;		
+		QDataStream in(this);
 		in.setByteOrder(QDataStream::LittleEndian);
-        //3次执行，即3秒
+       //3次执行，即3秒
         for (short i = 0; i < 3; i++)
         {
             this->waitForReadyRead(1000);
             auto sum = bytesAvailable();
-            data = this->readAll();
-            do
+            while (!atEnd())
             {
                 SMessageNodeBase receive;
                 in >> receive.header.checkNum >> receive.header.type >> receive.header.length;
-                in.readRawData(static_cast<char*>(receive.data), receive.header.length);
+                char* data = new char[receive.header.length];
+                in.readRawData(data, receive.header.length);
                 if (receive.header.type == message.type + 1)
                 {
-                    data.clear();
                     isSuccess = true;
+                    delete data;
+                    data = nullptr;
                     break;
                 }
-                //丢掉无用消息              
-                sum = sum - 8 - receive.header.length;
-            } while (sum > 0);
-            if (isSuccess)
-            {
-                break;
-            }
-            else
-            {
-                QThread::currentThread()->sleep(500);
+                delete data;
+                data = nullptr;
             }
         }
         //异常判断
@@ -274,16 +264,17 @@ void TcpSocket::blocked_send_reiceive(SMessageBase& message)
         {
             disConTcp(socketID);
             qDebug() << "error  no response  receive";
+            return;
         }
+        read_signal = connect(this, &TcpSocket::readyRead, this, &TcpSocket::readData);
 		//重新请求发送心跳包    
 		query.header.type = ChargingRequestMsg; query.header.length = sizeof(SRequestChargingMessage);
 		t_requestChargingMessage.monitoring[0] = 1;
 		query.data = &t_requestChargingMessage;
-		write_SMessageNodeBase(query);
-       
-		read_signal = connect(this, &TcpSocket::readyRead, this, &TcpSocket::readData);
+		write_SMessageNodeBase(query);       
+		
 		timer_->start(3000);
-		//timer_.setSingleShot(true);
+		
 	}
 	else if (message.nodeID == nodeID && message.shelfID == shelfID)
 	{
@@ -303,6 +294,7 @@ void TcpSocket::write_SMessageNodeBase(SMessageNodeBase& node_message)
     out.writeRawData(static_cast<const char*>(node_message.data), node_message.header.length);
 	
 	write(block);
+    this->flush();
 }
 
 
@@ -417,11 +409,11 @@ void TcpSocket::readData()
 			{
 				heartbeat = true;
 			}
-            //TODO  测试
-            if (ori_message.header.type == ChargingStateInfoMsg)
-            {
-                handleData(ori_message);
-            }
+            // //TODO  测试
+            // if (ori_message.header.type == ChargingStateInfoMsg)
+            // {
+            //     handleData(ori_message);
+            // }
 			if (ori_message.header.type != ChargingStateInfoMsg || cache.type == ChargingRequestMsg)
 				handleData(ori_message);
             
@@ -442,22 +434,8 @@ void TcpSocket::start_slot()
     //阻塞等待3秒
     this->waitForReadyRead(3000);    
     auto temp = this->bytesAvailable();
-    rawdata = this->readAll();
-    // QElapsedTimer timer1;
-    // timer1.start();   
-    // while (temp == 0)
-    // {
-    //     //write_SMessageNodeBase(query);
-    //     this->waitForReadyRead(1000);
-    //     temp = this->bytesAvailable();
-    //     rawdata = this->readAll();
-    //     if (timer1.hasExpired(5000))
-    //     {
-    //         disConTcp(socketID);
-    //         return;
-    //     }
-    //     
-    // }
+    rawdata = this->readAll();       
+  
     parse_SMessageNodeBase(rawdata, ori_message);   
 	if (ori_message.header.type != NoteInfoConfirmMsg)
     {
@@ -475,8 +453,8 @@ void TcpSocket::start_slot()
         //True为存在old
         qDebug() << "already exist a same MAC";
     }
-    //TODO
-    //setShelfNode();
+    
+    setShelfNode();
     QTime time = QTime::currentTime();
     qsrand(time.msec() + time.second() * 1000);
     shelfID = qrand()%7+1; nodeID = qrand()%16+1;
